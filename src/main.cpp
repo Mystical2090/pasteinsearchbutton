@@ -1,3 +1,5 @@
+#define CommentType CommentTypeDummy
+
 #include <Geode/Geode.hpp>
 #include <Geode/modify/LevelSearchLayer.hpp>
 #include <cocos2d.h>
@@ -11,39 +13,32 @@
 using namespace geode::prelude;
 using namespace cocos2d;
 
-class $modify(LevelSearchLayer) {
-    bool init() {
-        if (!LevelSearchLayer::init()) return false;
+class PasteHandler : public CCObject {
+public:
+    CCTextInputNode* input;
 
-        auto searchInput = static_cast<CCTextInputNode*>(this->getChildByID("search-input"));
-        if (!searchInput) return true;
+    static PasteHandler* create(CCTextInputNode* input) {
+        auto ret = new PasteHandler();
+        ret->input = input;
+        ret->autorelease();
+        return ret;
+    }
 
-        auto label = CCLabelBMFont::create("Paste", "goldFont.fnt");
-        auto button = CCMenuItemLabel::create(label, [searchInput](CCObject*) {
-            std::string text = getClipboardText();
-            if (!text.empty())
-                searchInput->setString(text.c_str());
-        });
-
-        button->setPosition({320.f, 202.f});
-        auto menu = CCMenu::createWithItem(button);
-        menu->setPosition(Vec2::ZERO);
-        this->addChild(menu, 100);
-
-        return true;
+    void onPaste(CCObject*) {
+        input->setString(getClipboardText().c_str());
     }
 
     static std::string getClipboardText() {
 #if defined(_WIN32)
         if (OpenClipboard(nullptr)) {
-            HANDLE hData = GetClipboardData(CF_TEXT);
-            if (hData) {
-                char* pszText = static_cast<char*>(GlobalLock(hData));
-                if (pszText) {
-                    std::string text(pszText);
-                    GlobalUnlock(hData);
+            HANDLE data = GetClipboardData(CF_TEXT);
+            if (data) {
+                char* text = static_cast<char*>(GlobalLock(data));
+                if (text) {
+                    std::string result(text);
+                    GlobalUnlock(data);
                     CloseClipboard();
-                    return text;
+                    return result;
                 }
             }
             CloseClipboard();
@@ -58,11 +53,11 @@ class $modify(LevelSearchLayer) {
                     CFDataRef data;
                     if (PasteboardCopyItemFlavorData(clipboard, item, CFSTR("public.utf8-plain-text"), &data) == noErr) {
                         const UInt8* ptr = CFDataGetBytePtr(data);
-                        CFIndex length = CFDataGetLength(data);
-                        std::string text(reinterpret_cast<const char*>(ptr), length);
+                        CFIndex len = CFDataGetLength(data);
+                        std::string result(reinterpret_cast<const char*>(ptr), len);
                         CFRelease(data);
                         CFRelease(clipboard);
-                        return text;
+                        return result;
                     }
                 }
             }
@@ -70,5 +65,26 @@ class $modify(LevelSearchLayer) {
         }
 #endif
         return "";
+    }
+};
+
+class $modify(LevelSearchLayer) {
+    bool init(int p0) {
+        if (!LevelSearchLayer::init(p0)) return false;
+
+        auto searchInput = static_cast<CCTextInputNode*>(this->getChildByID("search-input"));
+        if (!searchInput) return true;
+
+        auto label = CCLabelBMFont::create("Paste", "goldFont.fnt");
+        auto handler = PasteHandler::create(searchInput);
+        auto button = CCMenuItemLabel::create(label, handler, menu_selector(PasteHandler::onPaste));
+        button->setPosition({320.f, 202.f});
+
+        auto menu = CCMenu::create();
+        menu->addChild(button);
+        menu->setPosition(Vec2::ZERO);
+        this->addChild(menu, 100);
+
+        return true;
     }
 };
