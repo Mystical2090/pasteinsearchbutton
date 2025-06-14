@@ -1,49 +1,44 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/LevelSearchLayer.hpp>
-#include <Geode/utils/cocos.hpp>
-#import <Cocoa/Cocoa.h>
+#include <cocos2d.h>
+#import <Cocoa/Cocoa.h> // for clipboard access
 
 using namespace geode::prelude;
+using namespace cocos2d;
 
-class $modify(wow, LevelSearchLayer) {
+std::string getClipboardText() {
+    NSPasteboard* pasteboard = [NSPasteboard generalPasteboard];
+    NSString* text = [pasteboard stringForType:NSPasteboardTypeString];
+    if (text) {
+        return std::string([text UTF8String]);
+    }
+    return "";
+}
+
+class $modify(MySearchLayer, LevelSearchLayer) {
     bool init(int p0) {
         if (!LevelSearchLayer::init(p0)) return false;
 
-        auto searchInput = reinterpret_cast<CCTextInputNode*>(this->getChildByID("search-input"));
-        if (!searchInput) return true;
+        auto winSize = CCDirector::sharedDirector()->getWinSize();
+        auto menu = CCMenu::create();
+        menu->setPosition(CCPointZero);
 
         auto label = CCLabelBMFont::create("Paste", "bigFont.fnt");
-        auto pasteButton = CCMenuItemLabel::create(
-            label,
-            this,
-            menu_selector(PasteSearchMod::onPasteClicked)
-        );
+        auto button = CCMenuItemLabel::create(label, this, menu_selector(MySearchLayer::onPaste));
+        button->setPosition({winSize.width - 50, 30});
+        menu->addChild(button);
 
-        pasteButton->setPosition({280.f, 20.f});
-
-        auto menu = CCMenu::create();
-        menu->addChild(pasteButton);
-        menu->setPosition({0.f, 0.f});
-        searchInput->getParent()->addChild(menu);
-
+        this->addChild(menu, 10);
         return true;
     }
 
-    void onPasteClicked(CCObject*) {
-        auto searchInput = reinterpret_cast<CCTextInputNode*>(this->getChildByID("search-input"));
-        if (!searchInput) return;
-
-        std::string clipboardText = getClipboardText();
-        searchInput->setString(clipboardText.c_str());
-    }
-
-    std::string getClipboardText() {
-        NSPasteboard* pasteboard = [NSPasteboard generalPasteboard];
-        NSString* content = [pasteboard stringForType:NSPasteboardTypeString];
-        if (content) {
-            return std::string([content UTF8String]);
+    void onPaste(CCObject*) {
+        auto searchInput = static_cast<CCTextInputNode*>(this->getChildByID("level-search-input"));
+        if (searchInput) {
+            auto clip = getClipboardText();
+            searchInput->setString(clip.c_str());
         } else {
-            return "";
+            log::warn("Search input not found.");
         }
     }
 };
