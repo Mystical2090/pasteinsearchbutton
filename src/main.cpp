@@ -82,7 +82,7 @@ class $modify(LevelSearchLayer) {
 
         auto menu = CCMenu::create();
         menu->addChild(button);
-        menu->setPosition(Vec2::ZERO);
+        menu->setPosition(cocos2d::Vec2::ZERO);
         this->addChild(menu, 100);
 
         return true;
